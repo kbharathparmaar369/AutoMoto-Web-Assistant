@@ -1,0 +1,10 @@
+.env
+venv/
+__pycache__/
+*.pyc
+logs/
+*.log
+speech.mp3
+*.mp3
+.DS_Store
+Thumbs.db
