@@ -1,6 +1,9 @@
+from groq.types.chat import chat_completion_content_part_text_param
 import streamlit as st
 import logging
 import os
+
+from speech_handler import listen_from_mic
 
 from config import(
     ASSISTANT_NAME,ASSISTANT_OWNER,
@@ -72,6 +75,19 @@ def handle_query(user_input: str):
     st.session_state.total_queries +=1
     logger.info(f"Query #{st.session_state.total_queries}: '{user_input[:50]}'")
 
+def handle_voice_input():
+    """
+    Triggered when the mic button is pressed.
+    """
+    with st.spinner("Listening... speak now"):
+        text, status=listen_from_mic()
+    
+    if status!="success":
+        st.warning(status)
+        return
+    
+    st.info(f"you said: \"{text}\"")
+    handle_query(text)
 
 #Display all the past messages
 
