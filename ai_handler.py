@@ -134,3 +134,24 @@ def test_connection() -> bool:
     except Exception as e:
         logger.error(f"Groq API connection test failed : {e}")
         return False
+
+def transcribe_audio(audio_bytes: bytes) -> tuple[str, str]:
+    """
+    Transcribe raw audio bytes using Groq's Whisper API.
+    """
+    if not audio_bytes:
+        return "", "No audio data received"
+    
+    try:
+        # Send raw bytes directly to Groq Whisper
+        response = client.audio.transcriptions.create(
+            file=("speech.wav", audio_bytes),
+            model="whisper-large-v3",
+            response_format="text"
+        )
+        text = response.strip()
+        logger.info(f"Whisper transcription success: '{text[:80]}'")
+        return text, "success"
+    except Exception as e:
+        logger.error(f"Groq Whisper transcription failed: {e}")
+        return "", f"Speech translation failed: {e}"

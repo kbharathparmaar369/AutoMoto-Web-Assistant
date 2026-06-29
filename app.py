@@ -11,7 +11,7 @@ from config import(
     ASSISTANT_NAME,ASSISTANT_OWNER,SUPPORTED_LANGUAGES,DEFAULT_LANGUAGE,
     PAGE_TITLE,LOG_DIR
 )
-from ai_handler import get_ai_response,test_connection
+from ai_handler import get_ai_response, test_connection, transcribe_audio
 
 #Logging setup
 #Reuse te same log file ai_hnadler writes to
@@ -329,7 +329,7 @@ def handle_voice_input() -> bool:
 
 def handle_voice_input_bytes(audio_bytes: bytes) -> bool:
     with st.spinner("Processing voice input..."):
-        text, status = recognize_audio(audio_bytes)
+        text, status = transcribe_audio(audio_bytes)
     if status != "success":
         st.warning(status)
         return False
