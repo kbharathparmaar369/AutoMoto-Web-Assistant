@@ -1,3 +1,4 @@
+from config import DEFAULT_LANGUAGE
 from groq.types.chat import chat_completion_content_part_text_param
 import streamlit as st
 import logging
@@ -6,11 +7,10 @@ import os
 from speech_handler import listen_from_mic,text_to_speech
 
 from config import(
-    ASSISTANT_NAME,ASSISTANT_OWNER,
+    ASSISTANT_NAME,ASSISTANT_OWNER,SUPPORTED_LANGUAGES,DEFAULT_LANGUAGE,
     PAGE_TITLE,LOG_DIR
 )
-
-from ai_handler import get_ai_response
+from ai_handler import get_ai_response,test_connection
 
 #Logging setup
 #Reuse te same log file ai_hnadler writes to
@@ -21,8 +21,87 @@ logger=logging.getLogger(__name__)
 
 st.set_page_config(
     page_title=PAGE_TITLE,
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# custom css
+st.markdown("""<style>
+    .stApp{
+        background: linear-gradient(135deg, #0a0a1a 0%, #071524 100%);
+    }
+    [data-testid="stSidebar"]{
+        background-color: linear-gradient(180deg, #050f1a 0%, #071524 100%);
+        border-right: 1px solid rgba(0,212,255,0.2);
+        }
+    .user-msg{
+        background: rgba(0,212,255,0.1);
+        border: 1px solid rgba(0,212,255,0.25);
+        border-radius: 12px 4px 12px;
+        padding: 14px 18px;
+        margin: 10px 0;
+        color: #c8e8f5;
+        font-size: 15x;
+    
+    }
+
+    .bot-msg{
+        background: rgba(225,201,64,0.06);
+        border: 1px solid rgba(225,201,64,0.3);
+        border-radius: 12px 4px 12px;
+        padding:14px 18px;
+        color: #fff; 
+        font-size: 15px;
+        line-height: 1.6;
+    }
+
+    .msg-label{
+    
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    }
+    .user-label { color: rgba(0, 212, 255, 0.7); }
+    .bot-label  { color: rgba(255, 201, 64, 0.7); }
+    .main-title {
+        font-size: 32px;
+        font-weight: 900;
+        letter-spacing: 3px;
+        background: linear-gradient(135deg, #ffffff, #00d4ff, #ffc940);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 4px;
+    }
+    .stTextInput input {
+        background: rgba(0, 212, 255, 0.05) !important;
+        border: 1px solid rgba(0, 212, 255, 0.3) !important;
+        border-radius: 8px !important;
+        color: #c8e8f5 !important;
+    }
+    .stButton button {
+        background: linear-gradient(135deg, #00d4ff22, #00d4ff11);
+        border: 1px solid rgba(0, 212, 255, 0.4);
+        color: #00d4ff;
+        border-radius: 8px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        transition: all 0.2s;
+    }
+    .stButton button:hover {
+        background: rgba(0, 212, 255, 0.2);
+        border-color: rgba(0, 212, 255, 0.8);
+    }
+    hr { border-color: rgba(0, 212, 255, 0.15) !important; }
+    #MainMenu { visibility: hidden; }
+    footer    { visibility: hidden; }
+    header    { visibility: hidden; }
+
+    }
+
+     </style>""", unsafe_allow_html=True)
 
 #session state initialization
 
@@ -31,8 +110,12 @@ st.set_page_config(
 def init_session():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history=[]
+    if "language" not in st.session_state:
+        st.session_state.language=DEFAULT_LANGUAGE
     if "total_queries" not in st.session_state:
         st.session_state.total_queries=0
+    if "api_status" not in st.session_state:
+        st.session_state.api_status="None"
 
 
 #Handle the new question
@@ -89,6 +172,59 @@ def handle_voice_input():
     st.info(f"you said: \"{text}\"")
     handle_query(text)
 
+def render_sidebar():
+    with st.sidebar:
+        st.markdown(f"""
+<div style="text-align:center; margin-bottom:24px;">
+    <div style='font-size:40px'>🤖</div>
+    <div style='font-size:18px;font-weight:700; color:#00d4ff; letter-spacing:3px;'>{ASSISTANT_NAME}</div>
+    <div style='font-size: 11px; color:#4a7a99; letter-spacing:2px; margin-top:4px;'>AI WEB ASSISTANT</div>
+</div>
+""",unsafe_allow_html=True)
+
+        st.divider()
+
+        st.markdown("**🌏 Language**")
+        selected_language=st.selectbox(
+            label="select language",
+            options=list(SUPPORTED_LANGUAGES.keys()),
+            index=list(SUPPORTED_LANGUAGES.keys()).index(st.session_state.language),
+            label_visibility="collapsed",
+            
+            
+        )
+        st.session_state.language=selected_language
+        st.divider()
+
+        st.markdown("** System status **")
+        if st.button("Test API Connection"):
+            with st.spinner("Testing..."):
+                st.session_state.api_status=test_connection()
+        
+        status_text="🟢 ONLINE" if st.session_state.api_status is True else "🔴 OFFLINE"
+
+        st.caption(f"API : {status_text}")
+
+        st.divider()
+
+        st.markdown("**Session Stats**")
+        st.metric("Total Queries",st.session_state.total_queries)
+        st.metric("Messages" , len(st.session_state.chat_history))
+
+        st.divider()
+
+        if st.button("clear chat"):
+            st.session_state.chat_history=[]
+            st.session_state.total_queries=0
+            st.rerun()
+        
+        st.markdown(f"""
+<div style='text-align:center; margin-top:20px; font-size:11px; color:#2a4a5a;'>
+    Built by {ASSISTANT_OWNER} · Powered by Groq
+</div>
+""", unsafe_allow_html=True)
+            
+
 #Display all the past messages
 
 def render_chat():
@@ -99,14 +235,30 @@ def render_chat():
     we have nothing to loop.
     """
     if not st.session_state.chat_history:
-        st.write("No message yet. Ask AutoMoto something below.")
+        st.markdown(f"""
+        <div style='text-align:center; padding:60px 20px; color:#2a4a5a;'>
+            <div style='font-size:48px; margin-bottom:16px;'>🤖</div>
+            <div style='font-size:18px;color:#4a7a99; letter-spacing:2px;'>
+                {ASSISTANT_NAME}  IS ONLINE
+            </div>
+            <div style='font-size:13px; margin-top:8px;color:#2a4a5a;'>
+                Type a message or use the mic to start
+            </div>
+        </div>
+        """,unsafe_allow_html=True)
         return
-    
+
     for i,entry in enumerate(st.session_state.chat_history):
         if entry["role"]=="user":
-            st.write(f"**you**: {entry['content']}")
+            st.markdown(f"""
+                <div classs='msg-label user-label'> YOU -{ASSISTANT_NAME} </div>
+                <div class='user-msg'> {entry['content']} </div>
+            """,unsafe_allow_html=True)
         else:
-            st.write(f"**{ASSISTANT_NAME}**: {entry['content']}")
+            st.markdown(f"""
+            <div class='msg-label bot-label'>{ASSISTANT_NAME}</div>
+            <div class='bot-msg'>{entry['content']}</div>
+            """, unsafe_allow_html=True)
 
         is_last_message=(i== len(st.session_state.chat_history)-1)
         if is_last_message:
@@ -119,7 +271,8 @@ def render_audio_player(text: str):
     regenerating audio for the entire chat history even rerun.
     """
 
-    filepath, status=text_to_speech(text, lang_code="en")
+    lang_code=SUPPORTED_LANGUAGES[st.session_state.language][0]
+    filepath, status=text_to_speech(text, lang_code=lang_code)
 
     if status!="success":
         st.caption(f"Audio unavailable : {status}")
@@ -138,41 +291,87 @@ def render_audio_player(text: str):
         file_name="automoto_response.mp3",
         mime="audio/mp3"
     )
-        
+
+def handle_query(user_input: str):
+    if not user_input or not user_input.strip():
+        return
+
+    user_input=user_input.strip()
+    st.session_state.chat_history.append({"role":"user", "content": user_input})
+
+    with st.spinner(f"{ASSISTANT_NAME} IS THINKING..."):
+        response=get_ai_response(
+            user_message=user_input,
+            chat_history=st.session_state.chat_history[:-1],
+            language=st.session_state.language
+        )  
+
+    st.session_state.chat_history.append({
+        "role":"assistant",
+        "content":response
+    })    
+    st.session_state.total_queries +=1
+    logger.info(f"query #{st.session_state.total_queries}:{user_input[:50]}")
+
+def handle_voice_input():
+    with st.spinner("listening..."):
+        text,status=listen_from_mic()
+    if status !="success":
+        st.warning(status)
+        return
+    
+    st.info(f"you said :\"{text}\"")
+    handle_query(text)
+    
+      
 # MAIN LOGIC OF THE APP
 
 def main():
     init_session()
-    st.title(f"{ASSISTANT_NAME} - AI Assistant")
-    st.caption(f"Total quetion asked: {st.session_state.total_queries}")
-    st.divider()
+    render_sidebar()
 
-    #show the conversation so far
-
-    render_chat()
-    st.divider()
-
-    #Input box + button
-
-    col1,col2,col3=st.columns([4,1,1])
+    col1,col2=st.columns([3,1])
 
     with col1:
+        st.markdown(f"""
+<div class='main-title'>{ASSISTANT_NAME}</div>
+<div style='color:#4a7a99; font-size:13px; letter-spacing:2px; margin-bottom:20px;'>
+    MULTILINGUAL AI WEB ASSISTANT
+</div>
+""", unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+<div style='text-align:right; padding-top:10px; font-size:12px; color:#2a4a5a;'>
+    Language: <span style='color:#00d4ff'>{st.session_state.language}</span>
+</div>
+""", unsafe_allow_html=True)
+    st.divider()
+    render_chat()
+    st.divider()
+    
+    col_input,col_send,col_mic=st.columns([4,1,1])
+
+    with col_input:
         user_text=st.text_input(
             "Ask AutoMoto something",
             label_visibility="collapsed",
-            placeholder="Type your question here..."
+            placeholder=f"Ask {ASSISTANT_NAME} anything, {ASSISTANT_OWNER}...",
+            key="text_input",
         )
     
-    with col2:
-        send_clicked=st.button("Send")
-    
-    with col3:
-        mic_clicked=st.clicked("speak")
+    with col_send:
+        send_clicked=st.button("🚀",use_container_width=True)
+
+    with col_mic:
+        mic_clicked=st.button("🎙",use_container_width=True)
+
+    # Handle button clicks
     
     if send_clicked and user_text:
         handle_query(user_text)
         st.rerun()
-    
+
     if mic_clicked:
         handle_voice_input()
         st.rerun()
