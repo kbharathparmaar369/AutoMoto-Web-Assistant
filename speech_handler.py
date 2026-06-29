@@ -1,6 +1,35 @@
+from pandas._typing import FilePath
 from groq import __name
 import speech_recognition as sr
 import logging
+
+from gtts import gTTS
+import os
+
+def text_to_speech(text: str,lang_code: str="en")-> tuple[str, str]:
+    """
+    convert AI response text into a playable MP3 file.
+    i save the mp3 file because , gTTs design only support writing to a file or file-lie
+    object - and streamlit's st.audio() works cleanly when given
+    a file path, so this a simplest best way.
+    """
+    if not text or not text.strip():
+        return "","No text provided to convert tto speech"
+    
+    try:
+        # gTTS can get chocked some times
+        # so we wrapped it with loop
+
+        speech_text=text[:500]
+
+        tts=gTTS(text=speech_text,lang=lang_code)
+
+        filepath="speech.mp3"
+        tts.save(filepath)
+
+        return filepath, "success"
+    except Exception as e:
+        return "",f"Could not generate audio {e}"
 
 from config import SR_TIMEOUT, SR_PHRASE_TIME_LIMIT, SR_ENERGY
 

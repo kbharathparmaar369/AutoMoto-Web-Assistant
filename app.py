@@ -3,7 +3,7 @@ import streamlit as st
 import logging
 import os
 
-from speech_handler import listen_from_mic
+from speech_handler import listen_from_mic,text_to_speech
 
 from config import(
     ASSISTANT_NAME,ASSISTANT_OWNER,
@@ -102,13 +102,43 @@ def render_chat():
         st.write("No message yet. Ask AutoMoto something below.")
         return
     
-    for entry in st.session_state.chat_history:
+    for i,entry in enumerate(st.session_state.chat_history):
         if entry["role"]=="user":
             st.write(f"**you**: {entry['content']}")
         else:
             st.write(f"**{ASSISTANT_NAME}**: {entry['content']}")
 
+        is_last_message=(i== len(st.session_state.chat_history)-1)
+        if is_last_message:
+            render_audio_player(entry["content"])
+    
+def render_audio_player(text: str):
+    """
+    Generate and display audio controls for a given text.
+    called only for th latest AI response to avoid
+    regenerating audio for the entire chat history even rerun.
+    """
 
+    filepath, status=text_to_speech(text, lang_code="en")
+
+    if status!="success":
+        st.caption(f"Audio unavailable : {status}")
+        return
+
+    # this is the palyable audio widget
+    st.audio(filepath, format="audio/mp3")
+
+    # show the download button - reads the files as raw bytes
+    with open(filepath,"rb") as audio_file:
+        audio_bytes=audio_file.read()
+    
+    st.download_button(
+        label="Download audio",
+        data=audio_bytes,
+        file_name="automoto_response.mp3",
+        mime="audio/mp3"
+    )
+        
 # MAIN LOGIC OF THE APP
 
 def main():
@@ -124,11 +154,28 @@ def main():
 
     #Input box + button
 
-    user_text=st.text_input("Ask AutoMoto something :")
+    col1,col2,col3=st.columns([4,1,1])
 
-    if st.button("Send"):
+    with col1:
+        user_text=st.text_input(
+            "Ask AutoMoto something",
+            label_visibility="collapsed",
+            placeholder="Type your question here..."
+        )
+    
+    with col2:
+        send_clicked=st.button("Send")
+    
+    with col3:
+        mic_clicked=st.clicked("speak")
+    
+    if send_clicked and user_text:
         handle_query(user_text)
-        st.rerun() # forces the page to redraw with the new message
+        st.rerun()
+    
+    if mic_clicked:
+        handle_voice_input()
+        st.rerun()
 
 if __name__ =="__main__":
     main()
