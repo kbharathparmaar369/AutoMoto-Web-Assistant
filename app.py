@@ -3,8 +3,9 @@ from groq.types.chat import chat_completion_content_part_text_param
 import streamlit as st
 import logging
 import os
+from streamlit_mic_recorder import mic_recorder
 
-from speech_handler import listen_from_mic,text_to_speech
+from speech_handler import listen_from_mic, text_to_speech, recognize_audio
 
 from config import(
     ASSISTANT_NAME,ASSISTANT_OWNER,SUPPORTED_LANGUAGES,DEFAULT_LANGUAGE,
@@ -116,6 +117,8 @@ def init_session():
         st.session_state.total_queries=0
     if "api_status" not in st.session_state:
         st.session_state.api_status="None"
+    if "last_audio" not in st.session_state:
+        st.session_state.last_audio = None
 
 
 #Handle the new question
@@ -313,17 +316,28 @@ def handle_query(user_input: str):
     st.session_state.total_queries +=1
     logger.info(f"query #{st.session_state.total_queries}:{user_input[:50]}")
 
-def handle_voice_input():
+def handle_voice_input() -> bool:
     with st.spinner("listening..."):
         text,status=listen_from_mic()
     if status !="success":
         st.warning(status)
-        return
+        return False
     
     st.info(f"you said :\"{text}\"")
     handle_query(text)
+    return True
+
+def handle_voice_input_bytes(audio_bytes: bytes) -> bool:
+    with st.spinner("Processing voice input..."):
+        text, status = recognize_audio(audio_bytes)
+    if status != "success":
+        st.warning(status)
+        return False
     
-      
+    st.info(f"you said :\"{text}\"")
+    handle_query(text)
+    return True
+    
 # MAIN LOGIC OF THE APP
 
 def main():
@@ -364,7 +378,13 @@ def main():
         send_clicked=st.button("🚀",use_container_width=True)
 
     with col_mic:
-        mic_clicked=st.button("🎙",use_container_width=True)
+        audio = mic_recorder(
+            start_prompt="🎙️",
+            stop_prompt="⏹️",
+            just_once=True,
+            use_container_width=True,
+            key="mic_recorder"
+        )
 
     # Handle button clicks
     
@@ -372,9 +392,11 @@ def main():
         handle_query(user_text)
         st.rerun()
 
-    if mic_clicked:
-        handle_voice_input()
-        st.rerun()
+    # Handle browser voice input
+    if audio and audio["bytes"] != st.session_state.get("last_audio"):
+        st.session_state.last_audio = audio["bytes"]
+        if handle_voice_input_bytes(audio["bytes"]):
+            st.rerun()
 
 if __name__ =="__main__":
     main()

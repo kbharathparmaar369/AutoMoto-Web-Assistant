@@ -5,3 +5,4 @@ requests
 gTTS
 SpeechRecognition
 PyAudio; sys_platform == 'win32'
+streamlit-mic-recorder

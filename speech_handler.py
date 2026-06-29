@@ -2,6 +2,7 @@ from pandas._typing import FilePath
 from groq import __name
 import speech_recognition as sr
 import logging
+import io
 
 from gtts import gTTS
 import os
@@ -84,3 +85,31 @@ def listen_from_mic() -> tuple[str,str]:
     except Exception as e:
         logger.error(f"Unexpected voice input error: {e}")
         return "", f"Unexpected error: {e}"
+
+def recognize_audio(audio_bytes: bytes) -> tuple[str, str]:
+    """
+    Recognize speech from raw audio bytes (WAV format) received from browser.
+    """
+    if not audio_bytes:
+        return "", "No audio data received"
+    
+    recognizer = sr.Recognizer()
+    try:
+        # Load WAV bytes into a file-like object in memory
+        audio_file = io.BytesIO(audio_bytes)
+        with sr.AudioFile(audio_file) as source:
+            audio_data = recognizer.record(source)
+            
+        text = recognizer.recognize_google(audio_data)
+        logger.info(f"WAV recognized : '{text}'")
+        return text, "success"
+    except sr.UnknownValueError:
+        logger.warning("WAV input - could not understand..")
+        return "", "could not understand what you said so please try again"
+    except sr.RequestError as e:
+        logger.error(f"Speech API request error: {e}")
+        return "", "The service is unavailable.. please try again"
+    except Exception as e:
+        logger.error(f"Unexpected WAV input error: {e}")
+        return "", f"Unexpected error: {e}"
+
